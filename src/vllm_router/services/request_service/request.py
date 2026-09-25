@@ -1114,6 +1114,7 @@ async def route_sleep_wakeup_request(
         else:
             request_body = await request.body()
             response_status = None
+            response_content = None
             if request_body:
                 req_data = json.loads(request_body)
                 async with client.post(
@@ -1127,6 +1128,8 @@ async def route_sleep_wakeup_request(
                 ) as response:
                     response.raise_for_status()
                     response_status = response.status
+                    if endpoint == "/reset_prefix_cache":
+                        response_content = await response.json()
 
             pod_name = endpoints[0].pod_name
             if endpoint == "/sleep":
@@ -1134,9 +1137,18 @@ async def route_sleep_wakeup_request(
             elif endpoint == "/wake_up":
                 service_discovery.remove_sleep_label(pod_name)
 
+            # /reset_prefix_cache's response body is meaningful (success can
+            # legitimately be false while blocks are still held, e.g. by
+            # in-flight requests) and must be relayed to the caller, unlike
+            # /sleep and /wake_up whose upstream response body is always
+            # empty.
             return JSONResponse(
                 status_code=response_status,
-                content={"status": "success"},
+                content=(
+                    response_content
+                    if response_content is not None
+                    else {"status": "success"}
+                ),
                 headers={"X-Request-Id": request_id},
             )
 
