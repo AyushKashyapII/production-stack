@@ -63,11 +63,17 @@ def _mock_aiohttp_session(response_status, response_json=None):
 
 
 @pytest.mark.asyncio
-async def test_reset_prefix_cache_relays_real_response_body():
+@pytest.mark.parametrize("request_body", [b"", b"{}"])
+async def test_reset_prefix_cache_relays_real_response_body(request_body):
     """/reset_prefix_cache's real vLLM response body (`{"success": bool}`)
     must be relayed to the caller, since `success: false` is a legitimate,
     meaningful outcome (blocks still held) -- not swallowed into the old
     canned `{"status": "success"}`.
+
+    Parameterized over an empty and a non-empty request body: a real
+    /reset_prefix_cache caller never sends a body, but nothing stops one
+    from doing so (e.g. a client that always attaches `{}`), and this
+    endpoint's relay logic must not depend on which branch that puts it in.
     """
     endpoint_info = EndpointInfo("X", "http://engine-x:8000", "pod-x")
     service_discovery = MagicMock()
@@ -77,7 +83,9 @@ async def test_reset_prefix_cache_relays_real_response_body():
         response_status=200, response_json={"success": False}
     )
 
-    request = _build_request({"id": "X", "reset_external": "true"})
+    request = _build_request(
+        {"id": "X", "reset_external": "true"}, body=request_body
+    )
 
     with (
         patch(

@@ -1121,21 +1121,16 @@ async def route_sleep_wakeup_request(
             request_body = await request.body()
             response_status = None
             response_content = None
+
+            post_kwargs = {"headers": headers, "params": upstream_params}
             if request_body:
-                req_data = json.loads(request_body)
-                async with client.post(
-                    url, json=req_data, headers=headers, params=upstream_params
-                ) as response:
-                    response.raise_for_status()
-                    response_status = response.status
-            else:
-                async with client.post(
-                    url, headers=headers, params=upstream_params
-                ) as response:
-                    response.raise_for_status()
-                    response_status = response.status
-                    if endpoint == "/reset_prefix_cache":
-                        response_content = await response.json()
+                post_kwargs["json"] = json.loads(request_body)
+
+            async with client.post(url, **post_kwargs) as response:
+                response.raise_for_status()
+                response_status = response.status
+                if endpoint == "/reset_prefix_cache":
+                    response_content = await response.json()
 
             pod_name = endpoints[0].pod_name
             if endpoint == "/sleep":
